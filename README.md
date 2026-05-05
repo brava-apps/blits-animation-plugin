@@ -1,0 +1,1 @@
+# Animation plugin for Blits

@@ -1,0 +1,29 @@
+{
+  "name": "@brava-apps/blits-animation-plugin",
+  "version": "0.1.0",
+  "description": "Animation plugin for Blits",
+  "author": "BravaApps <hi@bravaapps.com>",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "peerDependencies": {
+    "@lightningjs/blits": "*"
+  },
+  "keywords": [
+    "blits",
+    "lightning",
+    "animation",
+    "plugin",
+    "timeline",
+    "sequence"
+  ]
+}
