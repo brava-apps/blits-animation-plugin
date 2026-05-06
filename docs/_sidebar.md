@@ -1,0 +1,5 @@
+- [Installation](/)
+- [Basic usage](/basic-usage)
+- Animation functions
+  - [Animation sequence](/animation-functions/sequence)
+  - [Animation timeline](/animation-functions/timeline)
