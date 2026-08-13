@@ -2,61 +2,161 @@ import symbols from '@lightningjs/blits/symbols'
 
 let elementId = 0
 const elementIds = new WeakMap()
+const activeJobs = new Set()
+let renderer
+let frameTickHandler
+
+const easings = {
+  linear: (t) => t,
+  ease: (t) => 1 - Math.pow(1 - t, 3),
+  'ease-in': (t) => t * t * t,
+  'ease-out': (t) => 1 - Math.pow(1 - t, 3),
+  'ease-in-out': (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
+  'ease-in-back': (t) => {
+    const c1 = 1.70158
+    return (c1 + 1) * t * t * t - c1 * t * t
+  },
+  'ease-out-back': (t) => {
+    const c1 = 1.70158
+    return 1 + (c1 + 1) * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+  },
+  'ease-in-out-back': (t) => {
+    const c2 = 1.70158 * 1.525
+    return t < 0.5
+      ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+      : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2
+  },
+}
 
 export default {
   name: 'animate',
 
   plugin() {
     return {
-      async sequence(steps) {
-        for (const step of steps) {
-          await runStep(createSequenceStep(step))
+      init(nextRenderer) {
+        if (renderer === nextRenderer) return
+
+        if (renderer && frameTickHandler) {
+          renderer.off('frameTick', frameTickHandler)
         }
+
+        renderer = nextRenderer
+        frameTickHandler = (_renderer, data) => tick(data || _renderer)
+        renderer.on('frameTick', frameTickHandler)
       },
 
-      async timeline(items, timelineDuration = 1000) {
+      sequence(steps) {
+        let cursor = 0
+        const segments = steps.map((step) => {
+          const delay = step.delay || 0
+          const segment = createSegment(createSequenceStep(step), cursor + delay, step.duration)
+          cursor = segment.end
+          return segment
+        })
+
+        return addJob(segments)
+      },
+
+      timeline(items, timelineDuration = 1000) {
         const groups = buildTimelineGroups(items)
+        const segments = []
 
         for (const group of groups.values()) {
           group.sort((a, b) => a.at - b.at)
           validateTimelineGroup(group)
+
+          for (const step of group) {
+            segments.push(
+              createSegment(step, timelineDuration * step.at, timelineDuration * step.duration)
+            )
+          }
         }
 
-        await Promise.all(
-          Array.from(groups.values()).map((group) => runTimelineGroup(group, timelineDuration))
-        )
+        return addJob(segments)
       },
     }
   },
 }
 
-function runStep(step, durationOverride, delayOverride) {
-  return new Promise((resolve) => {
-    const element = step.element
-    normalizeElementNumericProp(element, step.prop)
-    const targetValue = normalizeNumericValue(step.value)
+function addJob(segments) {
+  if (!renderer) {
+    return Promise.reject(new Error('Animation plugin is not initialized with a renderer'))
+  }
 
-    if (element.node && element.node[step.prop] === targetValue) {
-      if (step.onEnd) step.onEnd()
+  return new Promise((resolve) => {
+    if (segments.length === 0) {
       resolve()
       return
     }
 
-    const transition = {
-      value: targetValue,
-      duration: durationOverride == null ? step.duration : durationOverride,
-      delay: delayOverride == null ? step.delay : delayOverride,
-      easing: step.easing,
-      end: () => {
-        if (step.onEnd) step.onEnd()
-        resolve()
-      },
+    activeJobs.add({ segments, startTime: null, resolve })
+  })
+}
+
+function tick(data) {
+  if (!data || typeof data.time !== 'number') return
+
+  for (const job of activeJobs) {
+    if (job.startTime === null) job.startTime = data.time
+
+    const elapsed = data.time - job.startTime
+
+    for (const segment of job.segments) {
+      updateSegment(segment, elapsed)
     }
 
-    element.set(step.prop, {
-      transition,
-    })
-  })
+    if (job.segments.every((segment) => segment.finished)) {
+      activeJobs.delete(job)
+      job.resolve()
+    }
+  }
+}
+
+function createSegment(step, start, duration) {
+  return {
+    ...step,
+    start,
+    duration,
+    end: start + duration,
+    from: undefined,
+    easingFunction: getEasing(step.easing),
+    started: false,
+    finished: false,
+  }
+}
+
+function updateSegment(segment, elapsed) {
+  if (segment.finished || elapsed < segment.start) return
+
+  if (!segment.started) {
+    segment.started = true
+    normalizeElementNumericProp(segment.element, segment.prop)
+    segment.from = normalizeNumericValue(segment.element.node && segment.element.node[segment.prop])
+    segment.value = normalizeNumericValue(segment.value)
+
+    if (segment.from === segment.value) {
+      finishSegment(segment)
+      return
+    }
+  }
+
+  const progress =
+    segment.duration === 0 ? 1 : Math.min(1, (elapsed - segment.start) / segment.duration)
+  const value = segment.from + (segment.value - segment.from) * segment.easingFunction(progress)
+
+  segment.element.set(segment.prop, progress === 1 ? segment.value : value)
+
+  if (progress === 1) finishSegment(segment)
+}
+
+function finishSegment(segment) {
+  segment.finished = true
+  if (segment.onEnd) segment.onEnd()
+}
+
+function getEasing(easing) {
+  if (typeof easing === 'function') return easing
+  return easings[easing || 'ease'] || easings.linear
 }
 
 function getElement(element) {
@@ -78,21 +178,6 @@ function normalizeNumericValue(value) {
   }
 
   return value
-}
-
-async function runTimelineGroup(steps, timelineDuration) {
-  let previousEndTime = 0
-
-  for (const step of steps) {
-    const startTime = timelineDuration * step.at
-    const stepDuration = timelineDuration * step.duration
-    const endTime = startTime + stepDuration
-    const delay = Math.max(0, startTime - previousEndTime)
-
-    await runStep(step, stepDuration, delay)
-
-    previousEndTime = endTime
-  }
 }
 
 function buildTimelineGroups(items) {
@@ -126,9 +211,7 @@ function addTimelineGroup(groups, group) {
       createTimelineStep(step, step.element == null ? group.element : step.element, at, duration)
     )
 
-    if (step.at == null) {
-      cursor += duration
-    }
+    if (step.at == null) cursor += duration
   }
 }
 
@@ -174,10 +257,7 @@ function createStep(step, element, at, duration) {
 function addTimelineStep(groups, step) {
   const key = getStepKey(step)
 
-  if (!groups.has(key)) {
-    groups.set(key, [])
-  }
-
+  if (!groups.has(key)) groups.set(key, [])
   groups.get(key).push(step)
 }
 
@@ -195,18 +275,11 @@ function validateTimelineGroup(steps) {
       throw new Error(`Timeline step for "${step.prop}" is missing "element"`)
     }
 
-    if (step.prop == null) {
-      throw new Error('Timeline step is missing "prop"')
-    }
-
-    if (at < 0 || at > 1) {
-      throw new Error('Invalid timeline step: "at" must be between 0 and 1')
-    }
-
+    if (step.prop == null) throw new Error('Timeline step is missing "prop"')
+    if (at < 0 || at > 1) throw new Error('Invalid timeline step: "at" must be between 0 and 1')
     if (duration < 0 || duration > 1) {
       throw new Error('Invalid timeline step: "duration" must be between 0 and 1')
     }
-
     if (end > 1) {
       throw new Error(
         `Invalid timeline step: at (${at}) + duration (${duration}) exceeds timeline length`
@@ -218,10 +291,7 @@ function validateTimelineGroup(steps) {
     const prev = steps[i - 1]
     const curr = steps[i]
 
-    const prevEnd = prev.at + prev.duration
-    const currStart = curr.at
-
-    if (currStart < prevEnd) {
+    if (curr.at < prev.at + prev.duration) {
       throw new Error(
         `Overlapping timeline steps are not allowed for the same element and prop ("${curr.prop}")`
       )
@@ -234,9 +304,6 @@ function getStepKey(step) {
 }
 
 function getElementId(element) {
-  if (!elementIds.has(element)) {
-    elementIds.set(element, `el_${++elementId}`)
-  }
-
+  if (!elementIds.has(element)) elementIds.set(element, `el_${++elementId}`)
   return elementIds.get(element)
 }

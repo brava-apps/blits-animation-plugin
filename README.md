@@ -12,6 +12,7 @@ Then in the `index.js` register the Animation plugin
 
 ```js
 import Blits from '@lightningjs/blits'
+import symbols from '@lightningjs/blits/symbols'
 import AnimationPlugin from '@brava-apps/blits-animation-plugin'
 import App from './App.js'
 
@@ -19,6 +20,23 @@ Blits.Plugin(AnimationPlugin)
 
 Blits.Launch(App, 'app', {
   // launch settings
+})
+```
+
+Initialize the plugin with the renderer from the root application. The plugin uses the renderer's
+frame tick to update active animations.
+
+```js
+import Blits from '@lightningjs/blits'
+import symbols from '@lightningjs/blits/symbols'
+
+export default Blits.Application({
+  // application config
+  hooks: {
+    init() {
+      this.$animate.init(this[symbols.renderer]())
+    },
+  },
 })
 ```
 
