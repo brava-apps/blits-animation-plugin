@@ -89,8 +89,15 @@ function addJob(segments) {
       return
     }
 
+    for (let index = 0; index < segments.length; index++) {
+      segments[index].scheduleOrder = index
+    }
+    segments.sort((a, b) => a.start - b.start || a.scheduleOrder - b.scheduleOrder)
+
     activeJobs.add({
       segments,
+      activeSegments: [],
+      nextSegmentIndex: 0,
       remainingSegments: segments.length,
       startTime: null,
       resolve,
@@ -105,10 +112,27 @@ function tick(data) {
     if (job.startTime === null) job.startTime = data.time
 
     const elapsed = data.time - job.startTime
+    const segments = job.segments
+    const activeSegments = job.activeSegments
+    let nextSegmentIndex = job.nextSegmentIndex
 
-    for (const segment of job.segments) {
-      updateSegment(segment, elapsed, job)
+    while (nextSegmentIndex < segments.length && segments[nextSegmentIndex].start <= elapsed) {
+      activeSegments.push(segments[nextSegmentIndex])
+      nextSegmentIndex++
     }
+    job.nextSegmentIndex = nextSegmentIndex
+
+    let activeCount = 0
+    for (let index = 0; index < activeSegments.length; index++) {
+      const segment = activeSegments[index]
+      updateSegment(segment, elapsed, job)
+
+      if (!segment.finished) {
+        activeSegments[activeCount] = segment
+        activeCount++
+      }
+    }
+    activeSegments.length = activeCount
 
     if (job.remainingSegments === 0) {
       activeJobs.delete(job)
@@ -131,8 +155,6 @@ function createSegment(step, start, duration) {
 }
 
 function updateSegment(segment, elapsed, job) {
-  if (segment.finished || elapsed < segment.start) return
-
   if (!segment.started) {
     segment.started = true
     normalizeElementNumericProp(segment.element, segment.prop)
