@@ -23,6 +23,20 @@ Blits.Launch(App, 'app', {
 })
 ```
 
+The default export uses the frame-tick engine. The original renderer-transition engine is also
+available with the same `sequence()` and `timeline()` API:
+
+```js
+import AnimationPlugin from '@brava-apps/blits-animation-plugin/transition'
+// or: import { transitionEngine as AnimationPlugin } from '@brava-apps/blits-animation-plugin'
+
+Blits.Plugin(AnimationPlugin)
+```
+
+The transition engine delegates interpolation to Blits and does not need renderer initialization.
+To select the frame-tick engine explicitly, import the `frameTickEngine` named export or the
+`@brava-apps/blits-animation-plugin/frame-tick` subpath.
+
 Initialize the plugin with the renderer from the root application. The plugin uses the renderer's
 frame tick to update active animations.
 

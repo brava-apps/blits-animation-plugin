@@ -8,7 +8,9 @@
   "main": "./src/index.js",
   "module": "./src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./frame-tick": "./src/index.js",
+    "./transition": "./src/transition.js"
   },
   "files": [
     "src",

@@ -28,7 +28,7 @@ const easings = {
   },
 }
 
-export default {
+const frameTickEngine = {
   name: 'animate',
 
   plugin() {
@@ -89,7 +89,12 @@ function addJob(segments) {
       return
     }
 
-    activeJobs.add({ segments, startTime: null, resolve })
+    activeJobs.add({
+      segments,
+      remainingSegments: segments.length,
+      startTime: null,
+      resolve,
+    })
   })
 }
 
@@ -102,10 +107,10 @@ function tick(data) {
     const elapsed = data.time - job.startTime
 
     for (const segment of job.segments) {
-      updateSegment(segment, elapsed)
+      updateSegment(segment, elapsed, job)
     }
 
-    if (job.segments.every((segment) => segment.finished)) {
+    if (job.remainingSegments === 0) {
       activeJobs.delete(job)
       job.resolve()
     }
@@ -125,7 +130,7 @@ function createSegment(step, start, duration) {
   }
 }
 
-function updateSegment(segment, elapsed) {
+function updateSegment(segment, elapsed, job) {
   if (segment.finished || elapsed < segment.start) return
 
   if (!segment.started) {
@@ -135,7 +140,7 @@ function updateSegment(segment, elapsed) {
     segment.value = normalizeNumericValue(segment.value)
 
     if (segment.from === segment.value) {
-      finishSegment(segment)
+      finishSegment(segment, job)
       return
     }
   }
@@ -146,11 +151,12 @@ function updateSegment(segment, elapsed) {
 
   segment.element.set(segment.prop, progress === 1 ? segment.value : value)
 
-  if (progress === 1) finishSegment(segment)
+  if (progress === 1) finishSegment(segment, job)
 }
 
-function finishSegment(segment) {
+function finishSegment(segment, job) {
   segment.finished = true
+  job.remainingSegments--
   if (segment.onEnd) segment.onEnd()
 }
 
@@ -307,3 +313,7 @@ function getElementId(element) {
   if (!elementIds.has(element)) elementIds.set(element, `el_${++elementId}`)
   return elementIds.get(element)
 }
+
+export { frameTickEngine }
+export { default as transitionEngine } from './transition.js'
+export default frameTickEngine
