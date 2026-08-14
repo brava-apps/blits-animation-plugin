@@ -148,6 +148,8 @@ function createSegment(step, start, duration) {
     duration,
     end: start + duration,
     from: undefined,
+    inverseDuration: duration === 0 ? 0 : 1 / duration,
+    valueDelta: undefined,
     easingFunction: getEasing(step.easing),
     started: false,
     finished: false,
@@ -160,6 +162,7 @@ function updateSegment(segment, elapsed, job) {
     normalizeElementNumericProp(segment.element, segment.prop)
     segment.from = normalizeNumericValue(segment.element.node && segment.element.node[segment.prop])
     segment.value = normalizeNumericValue(segment.value)
+    segment.valueDelta = segment.value - segment.from
 
     if (segment.from === segment.value) {
       finishSegment(segment, job)
@@ -168,8 +171,8 @@ function updateSegment(segment, elapsed, job) {
   }
 
   const progress =
-    segment.duration === 0 ? 1 : Math.min(1, (elapsed - segment.start) / segment.duration)
-  const value = segment.from + (segment.value - segment.from) * segment.easingFunction(progress)
+    segment.duration === 0 ? 1 : Math.min(1, (elapsed - segment.start) * segment.inverseDuration)
+  const value = segment.from + segment.valueDelta * segment.easingFunction(progress)
 
   segment.element.set(segment.prop, progress === 1 ? segment.value : value)
 
