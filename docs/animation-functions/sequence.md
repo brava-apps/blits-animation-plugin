@@ -59,7 +59,7 @@ await this.$animate.sequence([
 
 ## Prop input
 
-The `prop` is the Blits prop that must animate. This can be things like `x`, `y`, `w`, `h`, `alpha`, `rotation`, `scale`, or another prop that Blits can animate with a transition.
+The `prop` is the numeric Blits prop that must animate. This can be things like `x`, `y`, `w`, `h`, `alpha`, `rotation`, or `scale`.
 
 ```js
 await this.$animate.sequence([
@@ -95,7 +95,7 @@ await this.$animate.sequence([
 
 ## Easing input
 
-With `easing` you can tell Blits which easing function must be used for the transition.
+With `easing` you can choose which easing function the plugin uses for the animation.
 
 ```js
 await this.$animate.sequence([
@@ -144,4 +144,4 @@ await this.$animate.sequence([
 
 `sequence()` does not start steps at the same time. If you want to start animation steps at specific moments in the same timeline, use [`this.$animate.timeline()`](./timeline.md).
 
-When the Element already has the same value as the `value` in the step, the plugin will skip that transition and continue with the next step.
+When the Element already has the same value as the `value` in the step, the plugin will skip that animation and continue with the next step.

@@ -224,7 +224,7 @@ await this.$animate.timeline(
 
 ## Prop input
 
-The `prop` is the Blits prop that must animate. This can be things like `x`, `y`, `w`, `h`, `alpha`, `rotation`, `scale`, or another prop that Blits can animate with a transition.
+The `prop` is the numeric Blits prop that must animate. This can be things like `x`, `y`, `w`, `h`, `alpha`, `rotation`, or `scale`.
 
 ```js
 await this.$animate.timeline(
@@ -253,7 +253,7 @@ await this.$animate.timeline(
 
 ## Easing input
 
-With `easing` you can tell Blits which easing function must be used for the transition.
+With `easing` you can choose which easing function the plugin uses for the animation.
 
 ```js
 await this.$animate.timeline(
@@ -341,4 +341,4 @@ The end of a step can not be after the end of the timeline. So `at: 0.8` with `d
 
 `timeline()` starts steps at moments in the same timeline. If you want every animation step to wait until the previous step is done, use [`this.$animate.sequence()`](./sequence.md).
 
-When the Element already has the same value as the `value` in the step, the plugin will skip that transition and continue with the timeline.
+When the Element already has the same value as the `value` in the step, the plugin will skip that animation and continue with the timeline.
