@@ -28,12 +28,14 @@ const easings = {
   },
 }
 
-const frameTickEngine = {
+const animate = {
   name: 'animate',
 
   plugin() {
     return {
-      init(nextRenderer) {
+      init(applicationOrRenderer) {
+        const nextRenderer = getRenderer(applicationOrRenderer)
+
         if (renderer === nextRenderer) return
 
         if (renderer && frameTickHandler) {
@@ -76,6 +78,14 @@ const frameTickEngine = {
       },
     }
   },
+}
+
+function getRenderer(applicationOrRenderer) {
+  if (applicationOrRenderer && typeof applicationOrRenderer[symbols.renderer] === 'function') {
+    return applicationOrRenderer[symbols.renderer]()
+  }
+
+  return applicationOrRenderer
 }
 
 function addJob(segments) {
@@ -339,6 +349,4 @@ function getElementId(element) {
   return elementIds.get(element)
 }
 
-export { frameTickEngine }
-export { default as transitionEngine } from './transition.js'
-export default frameTickEngine
+export default animate
