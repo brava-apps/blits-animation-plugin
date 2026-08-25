@@ -3,3 +3,4 @@
 - Animation functions
   - [Animation sequence](/animation-functions/sequence)
   - [Animation timeline](/animation-functions/timeline)
+- [Basic examples](/basic-examples)
