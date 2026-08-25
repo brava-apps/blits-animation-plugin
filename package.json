@@ -5,6 +5,10 @@
   "author": "BravaApps <hi@bravaapps.com>",
   "license": "Apache-2.0",
   "type": "module",
+  "scripts": {
+    "docs:examples:install": "npm install --prefix docs/examples/basic",
+    "docs:examples:build": "npm run build --prefix docs/examples/basic"
+  },
   "main": "./src/index.js",
   "module": "./src/index.js",
   "exports": {
