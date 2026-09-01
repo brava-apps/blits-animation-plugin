@@ -3,6 +3,8 @@ import symbols from '@lightningjs/blits/symbols'
 let elementId = 0
 const elementIds = new WeakMap()
 const activeJobs = new Set()
+const controllerJob = Symbol('job')
+const controllerPromise = Symbol('promise')
 let renderer
 let frameTickHandler
 
@@ -25,6 +27,57 @@ const easings = {
     return t < 0.5
       ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
       : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2
+  },
+}
+
+const controllerPrototype = {
+  pause() {
+    const job = this[controllerJob]
+    if (job !== undefined && job.settled === false && job.paused === false) {
+      job.paused = true
+      job.pauseTime = job.lastTime
+      activeJobs.delete(job)
+    }
+    return this
+  },
+
+  resume() {
+    const job = this[controllerJob]
+    if (job !== undefined && job.settled === false && job.paused === true) {
+      job.paused = false
+      job.resumePending = job.startTime !== null
+      activeJobs.add(job)
+    }
+    return this
+  },
+
+  cancel() {
+    const job = this[controllerJob]
+    if (job !== undefined) settleJob(job)
+    return this
+  },
+
+  reset() {
+    const job = this[controllerJob]
+    if (job !== undefined) {
+      settleJob(job)
+      for (const segment of job.segments) {
+        segment.element.set(segment.prop, segment.resetValue)
+      }
+    }
+    return this
+  },
+
+  then(onFulfilled, onRejected) {
+    return this[controllerPromise].then(onFulfilled, onRejected)
+  },
+
+  catch(onRejected) {
+    return this[controllerPromise].catch(onRejected)
+  },
+
+  finally(onFinally) {
+    return this[controllerPromise].finally(onFinally)
   },
 }
 
@@ -131,53 +184,9 @@ function addJob(segments) {
 }
 
 function createController(job, promise) {
-  const controller = {
-    pause() {
-      if (job !== undefined && job.settled === false && job.paused === false) {
-        job.paused = true
-        job.pauseTime = job.lastTime
-        activeJobs.delete(job)
-      }
-      return controller
-    },
-
-    resume() {
-      if (job !== undefined && job.settled === false && job.paused === true) {
-        job.paused = false
-        job.resumePending = job.startTime !== null
-        activeJobs.add(job)
-      }
-      return controller
-    },
-
-    cancel() {
-      if (job !== undefined) settleJob(job)
-      return controller
-    },
-
-    reset() {
-      if (job !== undefined) {
-        settleJob(job)
-        for (const segment of job.segments) {
-          segment.element.set(segment.prop, segment.resetValue)
-        }
-      }
-      return controller
-    },
-
-    then(onFulfilled, onRejected) {
-      return promise.then(onFulfilled, onRejected)
-    },
-
-    catch(onRejected) {
-      return promise.catch(onRejected)
-    },
-
-    finally(onFinally) {
-      return promise.finally(onFinally)
-    },
-  }
-
+  const controller = Object.create(controllerPrototype)
+  controller[controllerJob] = job
+  controller[controllerPromise] = promise
   return controller
 }
 
