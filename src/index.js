@@ -90,35 +90,113 @@ function getRenderer(applicationOrRenderer) {
 
 function addJob(segments) {
   if (!renderer) {
-    return Promise.reject(new Error('Animation plugin is not initialized with a renderer'))
+    return createController(
+      undefined,
+      Promise.reject(new Error('Animation plugin is not initialized with a renderer'))
+    )
   }
 
-  return new Promise((resolve) => {
-    if (segments.length === 0) {
-      resolve()
-      return
-    }
-
-    for (let index = 0; index < segments.length; index++) {
-      segments[index].scheduleOrder = index
-    }
-    segments.sort((a, b) => a.start - b.start || a.scheduleOrder - b.scheduleOrder)
-
-    activeJobs.add({
-      segments,
-      activeSegments: [],
-      nextSegmentIndex: 0,
-      remainingSegments: segments.length,
-      startTime: null,
-      resolve,
-    })
+  let resolve
+  const promise = new Promise((done) => {
+    resolve = done
   })
+  const job = {
+    segments,
+    activeSegments: [],
+    nextSegmentIndex: 0,
+    remainingSegments: segments.length,
+    startTime: null,
+    lastTime: null,
+    pauseTime: null,
+    resumePending: false,
+    paused: false,
+    settled: false,
+    resolve,
+  }
+
+  if (segments.length === 0) {
+    settleJob(job)
+    return createController(job, promise)
+  }
+
+  for (let index = 0; index < segments.length; index++) {
+    const segment = segments[index]
+    segment.scheduleOrder = index
+    segment.resetValue = segment.element.node && segment.element.node[segment.prop]
+  }
+  segments.sort((a, b) => a.start - b.start || a.scheduleOrder - b.scheduleOrder)
+
+  activeJobs.add(job)
+  return createController(job, promise)
+}
+
+function createController(job, promise) {
+  const controller = {
+    pause() {
+      if (job !== undefined && job.settled === false && job.paused === false) {
+        job.paused = true
+        job.pauseTime = job.lastTime
+        activeJobs.delete(job)
+      }
+      return controller
+    },
+
+    resume() {
+      if (job !== undefined && job.settled === false && job.paused === true) {
+        job.paused = false
+        job.resumePending = job.startTime !== null
+        activeJobs.add(job)
+      }
+      return controller
+    },
+
+    cancel() {
+      if (job !== undefined) settleJob(job)
+      return controller
+    },
+
+    reset() {
+      if (job !== undefined) {
+        settleJob(job)
+        for (const segment of job.segments) {
+          segment.element.set(segment.prop, segment.resetValue)
+        }
+      }
+      return controller
+    },
+
+    then(onFulfilled, onRejected) {
+      return promise.then(onFulfilled, onRejected)
+    },
+
+    catch(onRejected) {
+      return promise.catch(onRejected)
+    },
+
+    finally(onFinally) {
+      return promise.finally(onFinally)
+    },
+  }
+
+  return controller
+}
+
+function settleJob(job) {
+  if (job.settled === true) return
+  job.settled = true
+  activeJobs.delete(job)
+  job.resolve()
 }
 
 function tick(data) {
   if (!data || typeof data.time !== 'number') return
 
   for (const job of activeJobs) {
+    if (job.resumePending === true) {
+      job.startTime += data.time - job.pauseTime
+      job.resumePending = false
+    }
+    job.lastTime = data.time
     if (job.startTime === null) job.startTime = data.time
 
     const elapsed = data.time - job.startTime
@@ -145,8 +223,7 @@ function tick(data) {
     activeSegments.length = activeCount
 
     if (job.remainingSegments === 0) {
-      activeJobs.delete(job)
-      job.resolve()
+      settleJob(job)
     }
   }
 }
