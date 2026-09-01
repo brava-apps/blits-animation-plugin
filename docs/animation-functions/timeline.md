@@ -21,6 +21,26 @@ await this.$animate.timeline(
 )
 ```
 
+## Animation controller
+
+`timeline()` starts immediately and returns an animation controller that can be paused, resumed, cancelled, reset, or awaited until the timeline completes.
+
+```js
+const animation = this.$animate.timeline(
+  [{ element: this.$select('logo'), prop: 'x', value: 800, at: 0, duration: 1 }],
+  1000
+)
+
+animation.pause()
+animation.resume()
+animation.cancel()
+
+await animation
+```
+
+`cancel()` stops the timeline and resolves it normally. `reset()` also stops and resolves the
+timeline, then restores every affected property to the value it had when the timeline was created.
+
 ## Timeline duration
 
 The second parameter is the total timeline duration in `ms`.

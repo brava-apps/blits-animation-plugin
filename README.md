@@ -45,6 +45,21 @@ Next you can use the plugin from any component via `this.$animate`
 
 The Animation plugin has 2 public methods: `this.$animate.sequence()` and `this.$animate.timeline()`
 
+Both methods start immediately and return an awaitable animation controller.
+
+```js
+const animation = this.$animate.sequence([
+  { element: this.$select('logo'), prop: 'x', value: 800, duration: 1000 },
+])
+
+animation.pause()
+animation.resume()
+animation.cancel() // stops and resolves normally
+animation.reset() // also restores the original property values
+
+await animation
+```
+
 ### Sequence
 
 `this.$animate.sequence()` is a async function for doing animation steps in a sequence. The first parameter is for the `steps` and is a Array with objects with animation instructions for every step.

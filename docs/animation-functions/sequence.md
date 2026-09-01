@@ -16,6 +16,29 @@ await this.$animate.sequence([
 ])
 ```
 
+## Animation controller
+
+`sequence()` starts immediately and returns an animation controller that can be paused, resumed, cancelled, reset, or awaited until the sequence completes.
+
+```js
+const animation = this.$animate.sequence([
+  { element: this.$select('logo'), prop: 'x', value: 800, duration: 1000 },
+])
+
+animation.pause()
+animation.resume()
+animation.cancel()
+
+await animation
+```
+
+`cancel()` stops the animation and resolves it normally. `reset()` also stops and resolves the
+animation, then restores every affected property to the value it had when the sequence was created.
+
+```js
+animation.reset()
+```
+
 ## Step object
 
 A step object tells the plugin which Element must animate, which prop must change, and to which value.
