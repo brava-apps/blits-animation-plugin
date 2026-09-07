@@ -1,6 +1,7 @@
 - [Installation](/)
 - [Basic usage](/basic-usage)
 - Animation functions
+  - [Animate properties](/animation-functions/animate)
   - [Animation sequence](/animation-functions/sequence)
   - [Animation timeline](/animation-functions/timeline)
 - [Basic examples](/basic-examples)

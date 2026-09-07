@@ -1,6 +1,23 @@
 # Basic usage
 
-The Animation plugin has 2 public methods: `this.$animate.sequence()` and `this.$animate.timeline()`
+The Animation plugin has 3 public animation methods: `this.$animate.animate()`,
+`this.$animate.sequence()`, and `this.$animate.timeline()`.
+
+## Animate
+
+`this.$animate.animate()` animates multiple properties on one or more Elements or Components at the
+same time. The optional settings are `duration`, `delay`, and `easing`.
+
+```js
+await this.$animate.animate(
+  this.$select('logo'),
+  {
+    x: 800,
+    alpha: { from: 0, to: 1 },
+  },
+  { duration: 500, easing: 'ease-out' }
+)
+```
 
 ## Sequence
 

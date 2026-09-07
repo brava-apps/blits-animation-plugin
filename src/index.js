@@ -100,6 +100,48 @@ const animate = {
         renderer.on('frameTick', frameTickHandler)
       },
 
+      animate(targets, properties, options) {
+        const multipleTargets = Array.isArray(targets) === true
+        const targetCount = multipleTargets === true ? targets.length : 1
+        const props = Object.keys(properties)
+        const duration =
+          options === undefined || options.duration === undefined ? 300 : options.duration
+        const delay = options === undefined || options.delay === undefined ? 0 : options.delay
+        const easing = options === undefined ? undefined : options.easing
+        const segments = []
+
+        for (let targetIndex = 0; targetIndex < targetCount; targetIndex++) {
+          const target = multipleTargets === true ? targets[targetIndex] : targets
+          const element = getElement(target)
+
+          for (const prop of props) {
+            const property = properties[prop]
+            const hasFromTo =
+              property !== null &&
+              typeof property === 'object' &&
+              Array.isArray(property) === false &&
+              hasOwn(property, 'to') === true
+
+            segments.push(
+              createSegment(
+                {
+                  element,
+                  prop,
+                  value: hasFromTo === true ? property.to : property,
+                  explicitFrom: hasFromTo === true ? property.from : undefined,
+                  hasExplicitFrom: hasFromTo === true && hasOwn(property, 'from') === true,
+                  easing,
+                },
+                delay,
+                duration
+              )
+            )
+          }
+        }
+
+        return addJob(segments)
+      },
+
       sequence(steps) {
         let cursor = 0
         const segments = steps.map((step) => {
@@ -238,25 +280,30 @@ function tick(data) {
 }
 
 function createSegment(step, start, duration) {
-  return {
-    ...step,
-    start,
-    duration,
-    end: start + duration,
-    from: undefined,
-    inverseDuration: duration === 0 ? 0 : 1 / duration,
-    valueDelta: undefined,
-    easingFunction: getEasing(step.easing),
-    started: false,
-    finished: false,
-  }
+  step.start = start
+  step.duration = duration
+  step.end = start + duration
+  step.from = undefined
+  step.inverseDuration = duration === 0 ? 0 : 1 / duration
+  step.valueDelta = undefined
+  step.easingFunction = getEasing(step.easing)
+  step.started = false
+  step.finished = false
+  return step
 }
 
 function updateSegment(segment, elapsed, job) {
   if (!segment.started) {
     segment.started = true
-    normalizeElementNumericProp(segment.element, segment.prop)
-    segment.from = normalizeNumericValue(segment.element.node && segment.element.node[segment.prop])
+    if (segment.hasExplicitFrom === true) {
+      segment.from = normalizeNumericValue(segment.explicitFrom)
+      segment.element.set(segment.prop, segment.from)
+    } else {
+      normalizeElementNumericProp(segment.element, segment.prop)
+      segment.from = normalizeNumericValue(
+        segment.element.node && segment.element.node[segment.prop]
+      )
+    }
     segment.value = normalizeNumericValue(segment.value)
     segment.valueDelta = segment.value - segment.from
 
@@ -305,6 +352,10 @@ function normalizeNumericValue(value) {
   }
 
   return value
+}
+
+function hasOwn(object, prop) {
+  return Object.prototype.hasOwnProperty.call(object, prop)
 }
 
 function buildTimelineGroups(items) {

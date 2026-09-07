@@ -43,9 +43,10 @@ Next you can use the plugin from any component via `this.$animate`
 
 ## Basic plugin usage
 
-The Animation plugin has 2 public methods: `this.$animate.sequence()` and `this.$animate.timeline()`
+The Animation plugin has 3 public animation methods: `this.$animate.animate()`,
+`this.$animate.sequence()`, and `this.$animate.timeline()`.
 
-Both methods start immediately and return an awaitable animation controller.
+All three methods start immediately and return an awaitable animation controller.
 
 ```js
 const animation = this.$animate.sequence([
@@ -58,6 +59,23 @@ animation.cancel() // stops and resolves normally
 animation.reset() // also restores the original property values
 
 await animation
+```
+
+### Animate
+
+`this.$animate.animate()` animates multiple properties on one or more Elements or Components at the
+same time. Its signature is `animate(targets, properties, options?)`.
+
+```js
+await this.$animate.animate(
+  this.$select('logo'),
+  {
+    x: 800,
+    alpha: { from: 0, to: 1 },
+    scale: 1.1,
+  },
+  { duration: 500, delay: 100, easing: 'ease-out' }
+)
 ```
 
 ### Sequence
