@@ -21,7 +21,7 @@
   ],
   "sideEffects": false,
   "peerDependencies": {
-    "@lightningjs/blits": "*"
+    "@lightningjs/blits": "^2.10.0"
   },
   "keywords": [
     "blits",

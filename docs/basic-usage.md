@@ -3,6 +3,18 @@
 The Animation plugin has 3 public animation methods: `this.$animate.animate()`,
 `this.$animate.sequence()`, and `this.$animate.timeline()`.
 
+The plugin requires Blits 2.10.0 or later within the 2.x release line.
+
+All three methods accept properties that Blits can set, but interpolation requires an interpolatable
+value. Numeric values are interpolated directly.
+
+## Color animations
+
+All three methods support solid `color` values using packed `0xRRGGBBAA` numbers or strings,
+`#RGB`, `#RRGGBB`, `#RRGGBBAA`, or HTML color names such as `red` and `transparent`.
+RGBA channels are interpolated separately, with color easing clamped to avoid overshoot.
+Gradient objects and shader colors are not supported at the moment.
+
 ## Animate
 
 `this.$animate.animate()` animates multiple properties on one or more Elements or Components at the
@@ -14,6 +26,7 @@ await this.$animate.animate(
   {
     x: 800,
     alpha: { from: 0, to: 1 },
+    color: { from: '#f00', to: '#00f' },
   },
   { duration: 500, easing: 'ease-out' }
 )
