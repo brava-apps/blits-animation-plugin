@@ -1,4 +1,9 @@
 import symbols from '@lightningjs/blits/symbols'
+import htmlColors from '@lightningjs/blits/colors'
+
+const shortHex = /^#[\da-f]{3}$/i
+const hex = /^#[\da-f]{6}([\da-f]{2})?$/i
+const packedHex = /^0x[\da-f]{8}$/i
 
 let elementId = 0
 const elementIds = new WeakMap()
@@ -218,6 +223,7 @@ function addJob(segments) {
     const segment = segments[index]
     segment.scheduleOrder = index
     segment.resetValue = segment.element.node && segment.element.node[segment.prop]
+    if (segment.prop === 'color') segment.resetValue = parseColor(segment.resetValue)
   }
   segments.sort((a, b) => a.start - b.start || a.scheduleOrder - b.scheduleOrder)
 
@@ -280,6 +286,12 @@ function tick(data) {
 }
 
 function createSegment(step, start, duration) {
+  if (step.prop === 'color') {
+    step.red = step.green = step.blue = step.alpha = 0
+    step.redDelta = step.greenDelta = step.blueDelta = step.alphaDelta = 0
+    step.value = parseColor(step.value)
+    if (step.hasExplicitFrom === true) step.explicitFrom = parseColor(step.explicitFrom)
+  }
   step.start = start
   step.duration = duration
   step.end = start + duration
@@ -293,6 +305,10 @@ function createSegment(step, start, duration) {
 }
 
 function updateSegment(segment, elapsed, job) {
+  if (segment.prop === 'color') {
+    updateColorSegment(segment, elapsed, job)
+    return
+  }
   if (!segment.started) {
     segment.started = true
     if (segment.hasExplicitFrom === true) {
@@ -320,6 +336,64 @@ function updateSegment(segment, elapsed, job) {
   segment.element.set(segment.prop, progress === 1 ? segment.value : value)
 
   if (progress === 1) finishSegment(segment, job)
+}
+
+function updateColorSegment(segment, elapsed, job) {
+  if (!segment.started) {
+    segment.started = true
+    const from =
+      segment.hasExplicitFrom === true
+        ? segment.explicitFrom
+        : parseColor(segment.element.node.color)
+    const to = segment.value
+    segment.red = from >>> 24
+    segment.green = (from >>> 16) & 255
+    segment.blue = (from >>> 8) & 255
+    segment.alpha = from & 255
+    segment.redDelta = (to >>> 24) - segment.red
+    segment.greenDelta = ((to >>> 16) & 255) - segment.green
+    segment.blueDelta = ((to >>> 8) & 255) - segment.blue
+    segment.alphaDelta = (to & 255) - segment.alpha
+
+    if (from === to) {
+      segment.element.set('color', to)
+      finishSegment(segment, job)
+      return
+    }
+  }
+
+  const progress =
+    segment.duration === 0 ? 1 : Math.min(1, (elapsed - segment.start) * segment.inverseDuration)
+  let value = segment.value
+  if (progress < 1) {
+    // Back easings can overshoot; keep all channels within their byte range.
+    const eased = Math.max(0, Math.min(1, segment.easingFunction(progress)))
+    value =
+      ((Math.round(segment.red + segment.redDelta * eased) << 24) |
+        (Math.round(segment.green + segment.greenDelta * eased) << 16) |
+        (Math.round(segment.blue + segment.blueDelta * eased) << 8) |
+        Math.round(segment.alpha + segment.alphaDelta * eased)) >>>
+      0
+  }
+  segment.element.set('color', value)
+  if (progress === 1) finishSegment(segment, job)
+}
+
+function parseColor(value) {
+  if (typeof value === 'string') {
+    if (hasOwn(htmlColors, value)) return Number(htmlColors[value])
+    if (shortHex.test(value)) {
+      return parseInt(`${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}ff`, 16)
+    }
+    if (hex.test(value)) {
+      return value.length === 7
+        ? (parseInt(value.slice(1), 16) * 256 + 255) >>> 0
+        : parseInt(value.slice(1), 16)
+    }
+    if (packedHex.test(value)) return Number(value)
+  }
+  if (Number.isInteger(value) && value >= 0 && value <= 0xffffffff) return value
+  throw new Error('Invalid color: use an HTML color name, 0xRRGGBBAA, #RGB, #RRGGBB, or #RRGGBBAA')
 }
 
 function finishSegment(segment, job) {

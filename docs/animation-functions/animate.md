@@ -2,8 +2,8 @@
 
 ## Animate
 
-`this.$animate.animate()` animates multiple numeric properties on one or more Elements or
-Components at the same time. It starts immediately and returns an animation controller that can be
+`this.$animate.animate()` animates properties with interpolatable values on one or more Elements or
+Components at the same time. Numeric values and solid `color` values are interpolatable. It starts immediately and returns an animation controller that can be
 paused, resumed, cancelled, reset, or awaited until the animation completes.
 
 ```js
@@ -31,6 +31,9 @@ await this.$animate.animate(
 
 ## Properties
 
+Each property is passed to Blits, but the plugin interpolates numeric values and solid colors. Other
+value types can be set by Blits, but cannot be meaningfully interpolated by this plugin.
+
 Each property can contain its destination value:
 
 ```js
@@ -51,9 +54,13 @@ await this.$animate.animate(
 )
 ```
 
+## Color values
+
+Solid colors accept packed `0xRRGGBBAA` numbers, `#RGB`, `#RRGGBB`, `#RRGGBBAA`, and HTML color
+names such as `red` and `transparent`. RGBA channels are interpolated separately.
+
 ## Options
 
 - `duration` (optional) - duration in milliseconds; defaults to `300`
 - `delay` (optional) - delay before the animation starts in milliseconds; defaults to `0`
 - `easing` (optional) - named easing or easing function
-

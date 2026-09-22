@@ -8,6 +8,8 @@ First install the Animation plugin from NPM in your App project
 npm install @brava-apps/blits-animation-plugin
 ```
 
+The plugin requires Blits 2.10.0 or later within the 2.x release line.
+
 Then in the `index.js` register the Animation plugin
 
 ```js
@@ -48,6 +50,16 @@ The Animation plugin has 3 public animation methods: `this.$animate.animate()`,
 
 All three methods start immediately and return an awaitable animation controller.
 
+`animate()` accepts any property that Blits can set, but interpolation requires an interpolatable
+value. Numeric values are interpolated directly.
+
+### Color animations
+
+All three methods support solid `color` values. Use packed `0xRRGGBBAA` numbers or strings,
+`#RGB`, `#RRGGBB`, `#RRGGBBAA`, or HTML color names such as `red` and `transparent`.
+RGBA channels are interpolated separately, with color easing clamped to avoid overshoot.
+Gradient objects and shader colors are not supported at the moment.
+
 ```js
 const animation = this.$animate.sequence([
   { element: this.$select('logo'), prop: 'x', value: 800, duration: 1000 },
@@ -73,6 +85,7 @@ await this.$animate.animate(
     x: 800,
     alpha: { from: 0, to: 1 },
     scale: 1.1,
+    color: { from: '#f00', to: '#00f' },
   },
   { duration: 500, delay: 100, easing: 'ease-out' }
 )

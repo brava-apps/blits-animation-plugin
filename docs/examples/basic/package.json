@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@brava-apps/blits-animation-plugin": "file:../../..",
-    "@lightningjs/blits": "^2.0.1"
+    "@lightningjs/blits": "^2.10.0"
   },
   "devDependencies": {
     "vite": "^5.4.8"

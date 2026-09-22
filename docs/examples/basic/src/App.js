@@ -33,7 +33,7 @@ const template = `
       `
       <Element x="34" y="178" w="792" h="3" color="#334155" />
       <Element ref="timelineBox" x="34" y="143" w="70" h="70" color="#38bdf8" rounded="12" />
-      <Text x="34" y="270" size="20" color="#cbd5e1" content="x + rotation + scale" />
+      <Text x="34" y="270" size="20" color="#cbd5e1" content="x + rotation + scale + color" />
     `
     )}
 
@@ -96,6 +96,7 @@ export default Blits.Application({
       this.$select('sequenceBox').set('y', 143)
       this.$select('timelineBox').set('rotation', 0)
       this.$select('timelineBox').set('scale', 1)
+      this.$select('timelineBox').set('color', '#38bdf8')
     },
     pause(duration) {
       return new Promise((resolve) => this.$setTimeout(resolve, duration))
@@ -117,6 +118,7 @@ export default Blits.Application({
           [
             { element: timelineBox, prop: 'x', value: 700, at: 0, duration: 1 },
             { element: timelineBox, prop: 'rotation', value: 360, at: 0, duration: 1 },
+            { element: timelineBox, prop: 'color', value: '#f472b6', at: 0, duration: 1 },
             {
               element: timelineBox,
               prop: 'scale',
