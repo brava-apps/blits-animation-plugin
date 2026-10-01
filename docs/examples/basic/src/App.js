@@ -40,8 +40,8 @@ const template = `
     ${panel(
       70,
       600,
-      '3. Multiple elements',
-      'One timeline coordinates several elements',
+      '3. Animation groups',
+      'Two animations cancelled together after 1 second',
       `
       <Element x="34" y="150" w="792" h="3" color="#334155" />
       <Element ref="multiBoxOne" x="34" y="121" w="58" h="58" color="#f59e0b" rounded="29" />
@@ -75,9 +75,13 @@ export default Blits.Application({
   hooks: {
     init() {
       this.$animate.init(this)
+      this.exampleGroup = this.$animate.group()
     },
     ready() {
       this.replayExamples()
+    },
+    destroy() {
+      this.exampleGroup.dispose()
     },
   },
   methods: {
@@ -101,9 +105,20 @@ export default Blits.Application({
     pause(duration) {
       return new Promise((resolve) => this.$setTimeout(resolve, duration))
     },
+    async playGroupExample() {
+      this.exampleGroup.animate(this.$select('multiBoxOne'), { x: 734 }, {
+        duration: 2200, easing: 'linear',
+      })
+      this.exampleGroup.animate(this.$select('multiBoxTwo'), { x: 34 }, {
+        duration: 2200, easing: 'linear',
+      })
+      await this.pause(1000)
+      this.exampleGroup.cancel()
+    },
     async replayExamples() {
       this.resetExamples()
       await this.pause(500)
+      if (this.eol) return
 
       const sequenceBox = this.$select('sequenceBox')
       const timelineBox = this.$select('timelineBox')
@@ -131,19 +146,7 @@ export default Blits.Application({
           ],
           2200
         ),
-        this.$animate.timeline(
-          [
-            { element: this.$select('multiBoxOne'), prop: 'x', value: 734, at: 0, duration: 0.75 },
-            {
-              element: this.$select('multiBoxTwo'),
-              prop: 'x',
-              value: 34,
-              at: 0.25,
-              duration: 0.75,
-            },
-          ],
-          2200
-        ),
+        this.playGroupExample(),
         this.$animate.timeline(
           [
             {
@@ -176,7 +179,7 @@ export default Blits.Application({
       ])
 
       await this.pause(1000)
-      this.replayExamples()
+      if (!this.eol) this.replayExamples()
     },
   },
 })

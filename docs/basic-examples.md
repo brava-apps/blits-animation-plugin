@@ -1,6 +1,6 @@
 # Basic examples
 
-These live examples show the most common ways to compose animations. They replay automatically and use the same `sequence()` and `timeline()` APIs described in this documentation.
+These live examples show the most common ways to compose animations. They replay automatically and use the same `sequence()`, `timeline()` and group APIs described in this documentation.
 
 <div class="animation-demo-frame">
   <iframe src="examples/basic/dist/" title="Live Blits animation examples" loading="lazy" allow="autoplay"></iframe>
@@ -83,3 +83,20 @@ await this.$animate.timeline(
   2200,
 );
 ```
+
+## Animation groups
+
+These two boxes start moving together. After 1 second we cancel the group, so both stop
+halfway. The group can be used again, or disposed when you are done.
+
+```js
+const group = this.$animate.group()
+group.animate(firstBox, { x: 734 }, { duration: 2200, easing: 'linear' })
+group.animate(secondBox, { x: 34 }, { duration: 2200, easing: 'linear' })
+
+await this.pause(1000) // demo helper using this.$setTimeout
+group.cancel()
+```
+
+Dispose the group in `hooks.destroy` when keeping it on the component.
+See [Animation groups](animation-groups.md) for the component example.

@@ -4,4 +4,5 @@
   - [Animate properties](/animation-functions/animate)
   - [Animation sequence](/animation-functions/sequence)
   - [Animation timeline](/animation-functions/timeline)
+- [Animation groups](/animation-groups)
 - [Basic examples](/basic-examples)
