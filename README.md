@@ -26,7 +26,7 @@ Blits.Launch(App, 'app', {
 
 Initialize the plugin with the renderer from the root application. The plugin uses the renderer's
 frame tick to update active animations. This initialization is required before calling
-`sequence()` or `timeline()`.
+`animate()`, `sequence()` or `timeline()`.
 
 ```js
 import Blits from '@lightningjs/blits'
@@ -138,3 +138,39 @@ await this.$animate.timeline(
   1000
 )
 ```
+
+## Animation groups
+
+Groups expose the same `animate`, `sequence`, and `timeline` factories. Store a group as a plain
+component field and dispose it in `hooks.destroy`:
+
+```js
+hooks: {
+  init() {
+    this.animations = this.$animate.group()
+  },
+  ready() {
+    this.animations.animate(this.$select('card'), { alpha: 1 }, { duration: 200 })
+  },
+  destroy() {
+    this.animations.dispose()
+    this.animations = null
+  },
+}
+```
+
+`group.cancel()` stops running, delayed and paused jobs while preserving reset capability and
+leaving the group reusable. `group.dispose()` stops and releases pending jobs, permanently closes
+the group, and makes its factories throw. Both preserve current values and settle awaiters with
+`undefined`, without invoking pending step callbacks. Other groups and ungrouped work continue.
+
+Controllers also support terminal `animation.dispose()` and read-only `animation.outcome`:
+`null`, `completed`, `cancelled`, `reset`, or `disposed`. The first settlement reason is preserved.
+After `await animation`, check `animation.outcome === 'completed'` before completion-only work.
+Disposed controllers retain their promise/outcome, but their mutation methods become no-ops.
+
+Completion removes jobs from the scheduler and their group automatically. A retained settled
+controller still holds targets for `reset()`; disposing its former group does not revisit it.
+Drop the controller or explicitly dispose it when restoration is no longer needed.
+
+See [the animation groups guide](docs/animation-groups.md) for details. Automatic owner-based cleanup is deferred.

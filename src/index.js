@@ -10,6 +10,8 @@ const elementIds = new WeakMap()
 const activeJobs = new Set()
 const controllerJob = Symbol('job')
 const controllerPromise = Symbol('promise')
+const controllerOutcome = Symbol('outcome')
+const groupStateSymbol = Symbol('group')
 let renderer
 let frameTickHandler
 
@@ -58,19 +60,29 @@ const controllerPrototype = {
 
   cancel() {
     const job = this[controllerJob]
-    if (job !== undefined) settleJob(job)
+    if (job !== undefined) settleJob(job, 'cancelled')
     return this
   },
 
   reset() {
     const job = this[controllerJob]
     if (job !== undefined) {
-      settleJob(job)
+      settleJob(job, 'reset')
       for (const segment of job.segments) {
         segment.element.set(segment.prop, segment.resetValue)
       }
     }
     return this
+  },
+
+  dispose() {
+    const job = this[controllerJob]
+    if (job !== undefined) disposeJob(job)
+    return this
+  },
+
+  get outcome() {
+    return this[controllerOutcome]
   },
 
   then(onFulfilled, onRejected) {
@@ -84,6 +96,107 @@ const controllerPrototype = {
   finally(onFinally) {
     return this[controllerPromise].finally(onFinally)
   },
+}
+
+const factories = {
+  animate(targets, properties, options) {
+    const groupState = getGroupState(this)
+    const multipleTargets = Array.isArray(targets) === true
+    const targetCount = multipleTargets === true ? targets.length : 1
+    const props = Object.keys(properties)
+    const duration =
+      options === undefined || options.duration === undefined ? 300 : options.duration
+    const delay = options === undefined || options.delay === undefined ? 0 : options.delay
+    const easing = options === undefined ? undefined : options.easing
+    const segments = []
+
+    for (let targetIndex = 0; targetIndex < targetCount; targetIndex++) {
+      const target = multipleTargets === true ? targets[targetIndex] : targets
+      const element = getElement(target)
+
+      for (const prop of props) {
+        const property = properties[prop]
+        const hasFromTo =
+          property !== null &&
+          typeof property === 'object' &&
+          Array.isArray(property) === false &&
+          hasOwn(property, 'to') === true
+
+        segments.push(
+          createSegment(
+            {
+              element,
+              prop,
+              value: hasFromTo === true ? property.to : property,
+              explicitFrom: hasFromTo === true ? property.from : undefined,
+              hasExplicitFrom: hasFromTo === true && hasOwn(property, 'from') === true,
+              easing,
+            },
+            delay,
+            duration
+          )
+        )
+      }
+    }
+
+    return addJob(segments, groupState)
+  },
+
+  sequence(steps) {
+    const groupState = getGroupState(this)
+    let cursor = 0
+    const segments = steps.map((step) => {
+      const delay = step.delay || 0
+      const segment = createSegment(createSequenceStep(step), cursor + delay, step.duration)
+      cursor = segment.end
+      return segment
+    })
+
+    return addJob(segments, groupState)
+  },
+
+  timeline(items, timelineDuration = 1000) {
+    const groupState = getGroupState(this)
+    const groups = buildTimelineGroups(items)
+    const segments = []
+
+    for (const group of groups.values()) {
+      group.sort((a, b) => a.at - b.at)
+      validateTimelineGroup(group)
+
+      for (const step of group) {
+        segments.push(
+          createSegment(step, timelineDuration * step.at, timelineDuration * step.duration)
+        )
+      }
+    }
+
+    return addJob(segments, groupState)
+  },
+}
+
+const groupPrototype = {
+  ...factories,
+  cancel() {
+    for (const job of this[groupStateSymbol].jobs) settleJob(job, 'cancelled')
+    return this
+  },
+  dispose() {
+    const groupState = this[groupStateSymbol]
+    groupState.disposed = true
+    for (const job of groupState.jobs) disposeJob(job)
+    return this
+  },
+}
+
+function getGroupState(receiver) {
+  const groupState = receiver && receiver[groupStateSymbol]
+  assertGroupOpen(groupState)
+  return groupState
+}
+
+function assertGroupOpen(groupState) {
+  if (groupState && groupState.disposed) throw new Error('Animation group is disposed')
 }
 
 const animate = {
@@ -105,76 +218,11 @@ const animate = {
         renderer.on('frameTick', frameTickHandler)
       },
 
-      animate(targets, properties, options) {
-        const multipleTargets = Array.isArray(targets) === true
-        const targetCount = multipleTargets === true ? targets.length : 1
-        const props = Object.keys(properties)
-        const duration =
-          options === undefined || options.duration === undefined ? 300 : options.duration
-        const delay = options === undefined || options.delay === undefined ? 0 : options.delay
-        const easing = options === undefined ? undefined : options.easing
-        const segments = []
-
-        for (let targetIndex = 0; targetIndex < targetCount; targetIndex++) {
-          const target = multipleTargets === true ? targets[targetIndex] : targets
-          const element = getElement(target)
-
-          for (const prop of props) {
-            const property = properties[prop]
-            const hasFromTo =
-              property !== null &&
-              typeof property === 'object' &&
-              Array.isArray(property) === false &&
-              hasOwn(property, 'to') === true
-
-            segments.push(
-              createSegment(
-                {
-                  element,
-                  prop,
-                  value: hasFromTo === true ? property.to : property,
-                  explicitFrom: hasFromTo === true ? property.from : undefined,
-                  hasExplicitFrom: hasFromTo === true && hasOwn(property, 'from') === true,
-                  easing,
-                },
-                delay,
-                duration
-              )
-            )
-          }
-        }
-
-        return addJob(segments)
-      },
-
-      sequence(steps) {
-        let cursor = 0
-        const segments = steps.map((step) => {
-          const delay = step.delay || 0
-          const segment = createSegment(createSequenceStep(step), cursor + delay, step.duration)
-          cursor = segment.end
-          return segment
-        })
-
-        return addJob(segments)
-      },
-
-      timeline(items, timelineDuration = 1000) {
-        const groups = buildTimelineGroups(items)
-        const segments = []
-
-        for (const group of groups.values()) {
-          group.sort((a, b) => a.at - b.at)
-          validateTimelineGroup(group)
-
-          for (const step of group) {
-            segments.push(
-              createSegment(step, timelineDuration * step.at, timelineDuration * step.duration)
-            )
-          }
-        }
-
-        return addJob(segments)
+      ...factories,
+      group() {
+        const group = Object.create(groupPrototype)
+        group[groupStateSymbol] = { jobs: new Set(), disposed: false }
+        return group
       },
     }
   },
@@ -188,7 +236,8 @@ function getRenderer(applicationOrRenderer) {
   return applicationOrRenderer
 }
 
-function addJob(segments) {
+function addJob(segments, groupState) {
+  assertGroupOpen(groupState)
   if (!renderer) {
     return createController(
       undefined,
@@ -212,11 +261,14 @@ function addJob(segments) {
     paused: false,
     settled: false,
     resolve,
+    groupState,
+    controller: null,
   }
+  const controller = createController(job, promise)
 
   if (segments.length === 0) {
-    settleJob(job)
-    return createController(job, promise)
+    settleJob(job, 'completed')
+    return controller
   }
 
   for (let index = 0; index < segments.length; index++) {
@@ -227,22 +279,50 @@ function addJob(segments) {
   }
   segments.sort((a, b) => a.start - b.start || a.scheduleOrder - b.scheduleOrder)
 
+  // Target getters during reset capture can close the group too.
+  assertGroupOpen(groupState)
+  if (groupState) groupState.jobs.add(job)
   activeJobs.add(job)
-  return createController(job, promise)
+  return controller
 }
 
 function createController(job, promise) {
   const controller = Object.create(controllerPrototype)
   controller[controllerJob] = job
   controller[controllerPromise] = promise
+  controller[controllerOutcome] = null
+  if (job) job.controller = controller
   return controller
 }
 
-function settleJob(job) {
+function settleJob(job, outcome) {
   if (job.settled === true) return
   job.settled = true
+  job.controller[controllerOutcome] = outcome
   activeJobs.delete(job)
-  job.resolve()
+  if (job.groupState) job.groupState.jobs.delete(job)
+  job.groupState = null
+  job.activeSegments.length = 0
+  // Reset only needs targets, property names and creation-time values.
+  for (const segment of job.segments) {
+    segment.onEnd = null
+    segment.easing = null
+    segment.easingFunction = null
+  }
+  const resolve = job.resolve
+  job.resolve = null
+  resolve()
+}
+
+function disposeJob(job) {
+  settleJob(job, 'disposed')
+  for (const segment of job.segments) {
+    segment.element = null
+  }
+  job.segments.length = 0
+  job.activeSegments.length = 0
+  job.controller[controllerJob] = undefined
+  job.controller = null
 }
 
 function tick(data) {
@@ -271,16 +351,18 @@ function tick(data) {
     for (let index = 0; index < activeSegments.length; index++) {
       const segment = activeSegments[index]
       updateSegment(segment, elapsed, job)
+      if (job.settled) break
 
       if (!segment.finished) {
         activeSegments[activeCount] = segment
         activeCount++
       }
     }
+    if (job.settled) continue
     activeSegments.length = activeCount
 
     if (job.remainingSegments === 0) {
-      settleJob(job)
+      settleJob(job, 'completed')
     }
   }
 }
@@ -332,6 +414,7 @@ function updateSegment(segment, elapsed, job) {
   const progress =
     segment.duration === 0 ? 1 : Math.min(1, (elapsed - segment.start) * segment.inverseDuration)
   const value = segment.from + segment.valueDelta * segment.easingFunction(progress)
+  if (job.settled) return
 
   segment.element.set(segment.prop, progress === 1 ? segment.value : value)
 
@@ -368,6 +451,7 @@ function updateColorSegment(segment, elapsed, job) {
   if (progress < 1) {
     // Back easings can overshoot; keep all channels within their byte range.
     const eased = Math.max(0, Math.min(1, segment.easingFunction(progress)))
+    if (job.settled) return
     value =
       ((Math.round(segment.red + segment.redDelta * eased) << 24) |
         (Math.round(segment.green + segment.greenDelta * eased) << 16) |
@@ -399,7 +483,9 @@ function parseColor(value) {
 function finishSegment(segment, job) {
   segment.finished = true
   job.remainingSegments--
-  if (segment.onEnd) segment.onEnd()
+  const onEnd = segment.onEnd
+  segment.onEnd = null
+  if (onEnd) onEnd.call(segment)
 }
 
 function getEasing(easing) {

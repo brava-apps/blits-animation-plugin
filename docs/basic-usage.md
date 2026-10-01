@@ -79,3 +79,9 @@ await this.$animate.timeline(
   1000
 )
 ```
+
+## Animation groups
+
+Use `this.$animate.group()` to manage animations together and dispose the group in
+`hooks.destroy`. Controllers also support terminal `dispose()` and a read-only `outcome`.
+See [Animation groups](animation-groups.md) for lifecycle usage and retained-controller semantics.
