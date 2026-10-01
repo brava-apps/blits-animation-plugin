@@ -83,5 +83,7 @@ await this.$animate.timeline(
 ## Animation groups
 
 Use `this.$animate.group()` to manage animations together and dispose the group in
-`hooks.destroy`. Controllers also support terminal `dispose()` and a read-only `outcome`.
+`hooks.destroy`. Use `group.pause()` and `group.resume()` for a temporary stop; individual
+pauses are preserved. `group.cancel()` ends current animations and resolves their awaiters.
+Cancelled animations cannot resume, but the group can start new animations. Controllers also support terminal `dispose()` and a read-only `outcome`.
 See [Animation groups](animation-groups.md) for lifecycle usage and retained-controller semantics.

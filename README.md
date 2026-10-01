@@ -159,9 +159,15 @@ hooks: {
 }
 ```
 
-`group.cancel()` stops running, delayed and paused jobs while preserving reset capability and
-leaving the group reusable. `group.dispose()` stops and releases pending jobs, permanently closes
-the group, and makes its factories throw. Both preserve current values and settle awaiters with
+`group.pause()` temporarily pauses running animations and their delays. `group.resume()` continues
+them, preserving animations paused individually. New animations in a paused group wait too;
+controller resume cannot override a group pause. Awaiters keep waiting while paused.
+
+`group.cancel()` permanently stops current running, delayed and paused animations and resolves
+their awaiters with a `cancelled` outcome. They cannot resume, but can still reset their values.
+The group remains reusable and keeps its paused state.
+
+`group.dispose()` stops and releases pending jobs, permanently closes the group, and makes its factories throw. Both preserve current values and settle awaiters with
 `undefined`, without invoking pending step callbacks. Other groups and ungrouped work continue.
 
 Controllers also support terminal `animation.dispose()` and read-only `animation.outcome`:

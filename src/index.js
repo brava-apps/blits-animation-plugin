@@ -40,20 +40,18 @@ const easings = {
 const controllerPrototype = {
   pause() {
     const job = this[controllerJob]
-    if (job !== undefined && job.settled === false && job.paused === false) {
-      job.paused = true
-      job.pauseTime = job.lastTime
-      activeJobs.delete(job)
+    if (job !== undefined && !job.settled) {
+      job.individuallyPaused = true
+      updateJobPause(job)
     }
     return this
   },
 
   resume() {
     const job = this[controllerJob]
-    if (job !== undefined && job.settled === false && job.paused === true) {
-      job.paused = false
-      job.resumePending = job.startTime !== null
-      activeJobs.add(job)
+    if (job !== undefined && !job.settled) {
+      job.individuallyPaused = false
+      updateJobPause(job)
     }
     return this
   },
@@ -177,6 +175,20 @@ const factories = {
 
 const groupPrototype = {
   ...factories,
+  pause() {
+    const groupState = this[groupStateSymbol]
+    if (groupState.disposed || groupState.paused) return this
+    groupState.paused = true
+    for (const job of groupState.jobs) updateJobPause(job)
+    return this
+  },
+  resume() {
+    const groupState = this[groupStateSymbol]
+    if (groupState.disposed || !groupState.paused) return this
+    groupState.paused = false
+    for (const job of groupState.jobs) updateJobPause(job)
+    return this
+  },
   cancel() {
     for (const job of this[groupStateSymbol].jobs) settleJob(job, 'cancelled')
     return this
@@ -221,7 +233,7 @@ const animate = {
       ...factories,
       group() {
         const group = Object.create(groupPrototype)
-        group[groupStateSymbol] = { jobs: new Set(), disposed: false }
+        group[groupStateSymbol] = { jobs: new Set(), disposed: false, paused: false }
         return group
       },
     }
@@ -259,6 +271,7 @@ function addJob(segments, groupState) {
     pauseTime: null,
     resumePending: false,
     paused: false,
+    individuallyPaused: false,
     settled: false,
     resolve,
     groupState,
@@ -283,7 +296,22 @@ function addJob(segments, groupState) {
   assertGroupOpen(groupState)
   if (groupState) groupState.jobs.add(job)
   activeJobs.add(job)
+  updateJobPause(job)
   return controller
+}
+
+function updateJobPause(job) {
+  const paused = job.individuallyPaused || Boolean(job.groupState && job.groupState.paused)
+  if (paused === job.paused) return
+  job.paused = paused
+  if (paused) {
+    // A resume followed by another pause before a frame keeps the original pause time.
+    if (!job.resumePending) job.pauseTime = job.lastTime
+    activeJobs.delete(job)
+  } else {
+    job.resumePending = job.startTime !== null
+    activeJobs.add(job)
+  }
 }
 
 function createController(job, promise) {
@@ -350,7 +378,7 @@ function tick(data) {
     let activeCount = 0
     for (let index = 0; index < activeSegments.length; index++) {
       const segment = activeSegments[index]
-      updateSegment(segment, elapsed, job)
+      if (!job.paused && !segment.finished) updateSegment(segment, elapsed, job)
       if (job.settled) break
 
       if (!segment.finished) {

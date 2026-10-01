@@ -313,3 +313,70 @@ test('settlement releases callbacks and custom easing while preserving reset', a
     controller.dispose()
   }
 })
+
+test('group pause preserves individual pauses and resume timing', async () => {
+  const { api, tick } = setup()
+  const group = api.group(), a = element(), b = element()
+  const first = group.animate(a, { x: 100 }, { duration: 100, easing: 'linear' })
+  const second = group.animate(b, { x: 100 }, { duration: 100, easing: 'linear' })
+  tick(0); tick(25)
+  second.pause()
+  assert.equal(group.pause().pause(), group)
+  tick(100)
+  assert.equal(a.node.x, 25); assert.equal(b.node.x, 25)
+  first.pause() // Individual pause added while the group is paused.
+  assert.equal(group.resume().resume(), group)
+  tick(125)
+  assert.equal(a.node.x, 25); assert.equal(b.node.x, 25)
+  first.resume()
+  tick(150); tick(175)
+  assert.equal(a.node.x, 50); assert.equal(b.node.x, 25)
+  second.resume()
+  tick(200); tick(275)
+  await Promise.all([first, second])
+  assert.equal(a.node.x, 100); assert.equal(b.node.x, 100)
+  group.dispose().pause().resume()
+})
+
+test('new and delayed jobs wait for group resume; cancel cannot be resumed', async () => {
+  const { api, tick } = setup()
+  const group = api.group().pause(), target = element()
+  const controller = group.animate(target, { x: 100 }, { delay: 50, duration: 100, easing: 'linear' })
+  controller.pause().resume() // Cannot override the group pause.
+  tick(0); tick(100)
+  assert.equal(target.writes.length, 0)
+  assert.equal(controller.outcome, null)
+  group.resume()
+  tick(200); tick(225)
+  group.pause()
+  tick(500)
+  group.resume(); tick(600); tick(625)
+  assert.equal(target.node.x, 0)
+  tick(650)
+  assert.equal(target.node.x, 25)
+  group.cancel().resume()
+  await controller
+  const writes = target.writes.length
+  tick(1000)
+  assert.equal(target.writes.length, writes)
+  assert.equal(controller.outcome, 'cancelled')
+  group.dispose()
+})
+
+test('group pause from a callback stops other tracks and owned jobs in that frame', async () => {
+  const { api, tick } = setup()
+  const group = api.group(), a = element(), b = element()
+  const first = group.timeline([
+    { element: a, prop: 'x', value: 10, at: 0, duration: 0, onEnd() { group.pause() } },
+    { element: a, prop: 'color', value: '#fff', at: 0, duration: 0 },
+  ])
+  const second = group.animate(b, { x: 20 }, { duration: 0 })
+  tick(0)
+  assert.equal(a.node.color, 0xff0000ff)
+  assert.equal(b.node.x, 0)
+  group.resume(); tick(100)
+  await Promise.all([first, second])
+  assert.equal(a.node.color, 0xffffffff)
+  assert.equal(b.node.x, 20)
+  group.dispose()
+})
