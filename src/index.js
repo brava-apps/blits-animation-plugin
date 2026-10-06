@@ -17,23 +17,37 @@ let frameTickHandler
 
 const easings = {
   linear: (t) => t,
-  ease: (t) => 1 - Math.pow(1 - t, 3),
+  ease: (t) => {
+    const inverse = 1 - t
+    return 1 - inverse * inverse * inverse
+  },
   'ease-in': (t) => t * t * t,
-  'ease-out': (t) => 1 - Math.pow(1 - t, 3),
-  'ease-in-out': (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
+  'ease-out': (t) => {
+    const inverse = 1 - t
+    return 1 - inverse * inverse * inverse
+  },
+  'ease-in-out': (t) => {
+    if (t < 0.5) return 4 * t * t * t
+    const inverse = -2 * t + 2
+    return 1 - inverse * inverse * inverse / 2
+  },
   'ease-in-back': (t) => {
     const c1 = 1.70158
     return (c1 + 1) * t * t * t - c1 * t * t
   },
   'ease-out-back': (t) => {
     const c1 = 1.70158
-    return 1 + (c1 + 1) * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+    const inverse = t - 1
+    return 1 + (c1 + 1) * inverse * inverse * inverse + c1 * inverse * inverse
   },
   'ease-in-out-back': (t) => {
     const c2 = 1.70158 * 1.525
-    return t < 0.5
-      ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
-      : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2
+    if (t < 0.5) {
+      const scaled = 2 * t
+      return (scaled * scaled * ((c2 + 1) * scaled - c2)) / 2
+    }
+    const scaled = 2 * t - 2
+    return (scaled * scaled * ((c2 + 1) * scaled + c2) + 2) / 2
   },
 }
 
