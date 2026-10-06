@@ -382,12 +382,12 @@ function tick(data) {
       if (job.settled) break
 
       if (!segment.finished) {
-        activeSegments[activeCount] = segment
+        if (activeCount !== index) activeSegments[activeCount] = segment
         activeCount++
       }
     }
     if (job.settled) continue
-    activeSegments.length = activeCount
+    if (activeCount !== activeSegments.length) activeSegments.length = activeCount
 
     if (job.remainingSegments === 0) {
       settleJob(job, 'completed')
