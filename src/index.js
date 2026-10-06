@@ -410,22 +410,32 @@ function tick(data) {
 }
 
 function createSegment(step, start, duration) {
-  if (step.prop === 'color') {
-    step.red = step.green = step.blue = step.alpha = 0
-    step.redDelta = step.greenDelta = step.blueDelta = step.alphaDelta = 0
-    step.value = parseColor(step.value)
-    if (step.hasExplicitFrom === true) step.explicitFrom = parseColor(step.explicitFrom)
+  const segment = {
+    element: step.element,
+    prop: step.prop,
+    value: step.value,
+    explicitFrom: step.explicitFrom,
+    hasExplicitFrom: step.hasExplicitFrom === true,
+    easing: step.easing,
+    onEnd: step.onEnd,
+    start,
+    duration,
+    end: start + duration,
+    from: undefined,
+    inverseDuration: duration === 0 ? 0 : 1 / duration,
+    valueDelta: undefined,
+    easingFunction: getEasing(step.easing),
+    started: false,
+    finished: false,
   }
-  step.start = start
-  step.duration = duration
-  step.end = start + duration
-  step.from = undefined
-  step.inverseDuration = duration === 0 ? 0 : 1 / duration
-  step.valueDelta = undefined
-  step.easingFunction = getEasing(step.easing)
-  step.started = false
-  step.finished = false
-  return step
+
+  if (segment.prop === 'color') {
+    segment.red = segment.green = segment.blue = segment.alpha = 0
+    segment.redDelta = segment.greenDelta = segment.blueDelta = segment.alphaDelta = 0
+    segment.value = parseColor(segment.value)
+    if (segment.hasExplicitFrom === true) segment.explicitFrom = parseColor(segment.explicitFrom)
+  }
+  return segment
 }
 
 function updateSegment(segment, elapsed, job) {
