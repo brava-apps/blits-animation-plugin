@@ -399,8 +399,9 @@ function tick(data) {
     const segments = job.segments
     const activeSegments = job.activeSegments
     let nextSegmentIndex = job.nextSegmentIndex
+    const segmentCount = segments.length
 
-    while (nextSegmentIndex < segments.length && segments[nextSegmentIndex].start <= elapsed) {
+    while (nextSegmentIndex < segmentCount && segments[nextSegmentIndex].start <= elapsed) {
       activeSegments.push(segments[nextSegmentIndex])
       nextSegmentIndex++
     }
@@ -414,7 +415,9 @@ function tick(data) {
           : Math.min(1, (elapsed - job.sharedStart) * job.sharedInverseDuration)
       job.sharedEased = job.sharedEasingFunction(job.sharedProgress)
     }
-    for (let index = 0; index < activeSegments.length; index++) {
+    let index = 0
+    let activeLength = activeSegments.length
+    while (index < activeLength) {
       const segment = activeSegments[index]
       if (!job.paused && !segment.finished) updateSegment(segment, elapsed, job)
       if (job.settled) break
@@ -423,6 +426,7 @@ function tick(data) {
         if (activeCount !== index) activeSegments[activeCount] = segment
         activeCount++
       }
+      index++
     }
     if (job.settled) continue
     if (activeCount !== activeSegments.length) activeSegments.length = activeCount
