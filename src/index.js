@@ -275,6 +275,16 @@ function addJob(segments, groupState) {
   const promise = new Promise((done) => {
     resolve = done
   })
+  const firstSegment = segments[0]
+  const sharedEasing =
+    firstSegment !== undefined &&
+    firstSegment.easingIsBuiltIn === true &&
+    segments.every(
+      (segment) =>
+        segment.start === firstSegment.start &&
+        segment.duration === firstSegment.duration &&
+        segment.easingFunction === firstSegment.easingFunction
+    )
   const job = {
     segments,
     activeSegments: [],
@@ -290,6 +300,13 @@ function addJob(segments, groupState) {
     resolve,
     groupState,
     controller: null,
+    sharedEasing,
+    sharedStart: firstSegment && firstSegment.start,
+    sharedDuration: firstSegment && firstSegment.duration,
+    sharedInverseDuration: firstSegment && firstSegment.inverseDuration,
+    sharedEasingFunction: firstSegment && firstSegment.easingFunction,
+    sharedProgress: 0,
+    sharedEased: 0,
   }
   const controller = createController(job, promise)
 
@@ -390,6 +407,13 @@ function tick(data) {
     job.nextSegmentIndex = nextSegmentIndex
 
     let activeCount = 0
+    if (job.sharedEasing) {
+      job.sharedProgress =
+        job.sharedDuration === 0
+          ? 1
+          : Math.min(1, (elapsed - job.sharedStart) * job.sharedInverseDuration)
+      job.sharedEased = job.sharedEasingFunction(job.sharedProgress)
+    }
     for (let index = 0; index < activeSegments.length; index++) {
       const segment = activeSegments[index]
       if (!job.paused && !segment.finished) updateSegment(segment, elapsed, job)
@@ -417,6 +441,7 @@ function createSegment(step, start, duration) {
     explicitFrom: step.explicitFrom,
     hasExplicitFrom: step.hasExplicitFrom === true,
     easing: step.easing,
+    easingIsBuiltIn: typeof step.easing !== 'function',
     onEnd: step.onEnd,
     start,
     duration,
@@ -463,9 +488,13 @@ function updateSegment(segment, elapsed, job) {
     }
   }
 
-  const progress =
-    segment.duration === 0 ? 1 : Math.min(1, (elapsed - segment.start) * segment.inverseDuration)
-  const value = segment.from + segment.valueDelta * segment.easingFunction(progress)
+  const progress = job.sharedEasing
+    ? job.sharedProgress
+    : segment.duration === 0
+      ? 1
+      : Math.min(1, (elapsed - segment.start) * segment.inverseDuration)
+  const eased = job.sharedEasing ? job.sharedEased : segment.easingFunction(progress)
+  const value = segment.from + segment.valueDelta * eased
   if (job.settled) return
 
   segment.element.set(segment.prop, progress === 1 ? segment.value : value)
@@ -497,12 +526,17 @@ function updateColorSegment(segment, elapsed, job) {
     }
   }
 
-  const progress =
-    segment.duration === 0 ? 1 : Math.min(1, (elapsed - segment.start) * segment.inverseDuration)
+  const progress = job.sharedEasing
+    ? job.sharedProgress
+    : segment.duration === 0
+      ? 1
+      : Math.min(1, (elapsed - segment.start) * segment.inverseDuration)
   let value = segment.value
   if (progress < 1) {
     // Back easings can overshoot; keep all channels within their byte range.
-    const eased = Math.max(0, Math.min(1, segment.easingFunction(progress)))
+    const eased = job.sharedEasing
+      ? Math.max(0, Math.min(1, job.sharedEased))
+      : Math.max(0, Math.min(1, segment.easingFunction(progress)))
     if (job.settled) return
     value =
       ((Math.round(segment.red + segment.redDelta * eased) << 24) |
