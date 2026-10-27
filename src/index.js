@@ -167,6 +167,11 @@ const factories = {
     return addJob(segments, groupState)
   },
 
+  /**
+   * Animate steps positioned within a timeline.
+   * @param {Array<object>} items Animation steps or groups of steps.
+   * @param {number} [timelineDuration=1000] Total duration in milliseconds.
+   */
   timeline(items, timelineDuration = 1000) {
     const groupState = getGroupState(this)
     const groups = buildTimelineGroups(items)

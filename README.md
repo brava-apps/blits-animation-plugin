@@ -43,6 +43,22 @@ export default Blits.Application({
 
 Next you can use the plugin from any component via `this.$animate`
 
+## Type completion
+
+To declare type completion for the animation plugin explicitly in your app, create a `blits.d.ts`
+file if it does not already exist and add the following. Place it at the app root or in `src`,
+ensuring it is included by your `tsconfig.json` or `jsconfig.json`.
+
+```typescript
+import type { AnimationPluginApi } from '@brava-apps/blits-animation-plugin'
+
+declare module '@lightningjs/blits' {
+  interface CustomComponentProperties {
+    $animate: AnimationPluginApi
+  }
+}
+```
+
 ## Basic plugin usage
 
 The Animation plugin has 3 public animation methods: `this.$animate.animate()`,
