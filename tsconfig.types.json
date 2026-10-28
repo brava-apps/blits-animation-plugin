@@ -3,6 +3,8 @@
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
+    "strictNullChecks": true,
+    "skipLibCheck": true,
     "declaration": true,
     "emitDeclarationOnly": true,
     "noEmitOnError": true,

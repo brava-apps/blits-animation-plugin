@@ -1,6 +1,65 @@
 import symbols from '@lightningjs/blits/symbols'
 import htmlColors from '@lightningjs/blits/colors'
 
+/**
+ * @typedef {import('@lightningjs/blits').ComponentBase | AnimationElement} AnimationTarget
+ * @typedef {{ node: object, set: (prop: string, value: number | string) => void }} AnimationElement
+ * @typedef {number | string} AnimationValue Numbers, numeric strings or solid colors.
+ * @typedef {keyof typeof easings | ((progress: number) => number)} Easing
+ * @typedef {Record<string, AnimationValue | { from?: AnimationValue, to: AnimationValue }>} AnimationProperties
+ * @typedef {'completed' | 'cancelled' | 'reset' | 'disposed'} AnimationOutcome
+ */
+
+/**
+ * Await the controller to wait for settlement. It resolves without a value, also when cancelled.
+ * @typedef {Object} AnimationControls
+ * @property {() => AnimationController} pause Pause the animation.
+ * @property {() => AnimationController} resume Continue the animation.
+ * @property {() => AnimationController} cancel Stop without restoring values.
+ * @property {() => AnimationController} reset Stop and restore original values.
+ * @property {() => AnimationController} dispose Stop and release targets.
+ */
+
+/**
+ * @typedef {AnimationControls & Pick<Promise<void>, 'then' | 'catch' | 'finally'> & { readonly outcome: AnimationOutcome | null }} AnimationController
+ * @typedef {typeof factories & {
+ *   pause: () => AnimationGroup,
+ *   resume: () => AnimationGroup,
+ *   cancel: () => AnimationGroup,
+ *   dispose: () => AnimationGroup
+ * }} AnimationGroup
+ */
+
+/**
+ * @typedef {Object} AnimationOptions
+ * @property {number} [duration=300] Duration in ms.
+ * @property {number} [delay=0] Delay in ms.
+ * @property {Easing} [easing='ease'] Easing name or function.
+ */
+
+/**
+ * @typedef {Object} AnimationStep
+ * @property {AnimationTarget} element Element or component to animate.
+ * @property {string} prop Property name.
+ * @property {AnimationValue} value Target value.
+ * @property {number} duration Duration in ms for sequences, or a fraction of the timeline.
+ * @property {Easing} [easing='ease'] Easing name or function.
+ * @property {() => void} [onEnd] Called when this step finishes.
+ */
+
+/**
+ * @typedef {AnimationStep & { delay?: number }} SequenceStep
+ * @typedef {AnimationStep & { at: number }} TimelineStep
+ * @typedef {Omit<AnimationStep, 'element'> & { element?: AnimationTarget, at?: number }} TimelineGroupStep
+ */
+
+/**
+ * @typedef {Object} TimelineGroup
+ * @property {AnimationTarget} [element] Default target for the steps.
+ * @property {number} [at=0] Start position as a fraction of the timeline.
+ * @property {TimelineGroupStep[]} steps Steps run in order unless they have an explicit at.
+ */
+
 const shortHex = /^#[\da-f]{3}$/i
 const hex = /^#[\da-f]{6}([\da-f]{2})?$/i
 const packedHex = /^0x[\da-f]{8}$/i
@@ -15,6 +74,7 @@ const groupStateSymbol = Symbol('group')
 let renderer
 let frameTickHandler
 
+/** @satisfies {Record<string, (progress: number) => number>} */
 const easings = {
   linear: (t) => t,
   ease: (t) => {
@@ -29,7 +89,7 @@ const easings = {
   'ease-in-out': (t) => {
     if (t < 0.5) return 4 * t * t * t
     const inverse = -2 * t + 2
-    return 1 - inverse * inverse * inverse / 2
+    return 1 - (inverse * inverse * inverse) / 2
   },
   'ease-in-back': (t) => {
     const c1 = 1.70158
@@ -52,6 +112,10 @@ const easings = {
 }
 
 const controllerPrototype = {
+  /**
+   * Pause the animation.
+   * @returns {AnimationController}
+   */
   pause() {
     const job = this[controllerJob]
     if (job !== undefined && !job.settled) {
@@ -61,6 +125,10 @@ const controllerPrototype = {
     return this
   },
 
+  /**
+   * Continue a paused animation.
+   * @returns {AnimationController}
+   */
   resume() {
     const job = this[controllerJob]
     if (job !== undefined && !job.settled) {
@@ -70,12 +138,20 @@ const controllerPrototype = {
     return this
   },
 
+  /**
+   * Stop and resolve without restoring values.
+   * @returns {AnimationController}
+   */
   cancel() {
     const job = this[controllerJob]
     if (job !== undefined) settleJob(job, 'cancelled')
     return this
   },
 
+  /**
+   * Stop and restore the values from creation time.
+   * @returns {AnimationController}
+   */
   reset() {
     const job = this[controllerJob]
     if (job !== undefined) {
@@ -87,30 +163,45 @@ const controllerPrototype = {
     return this
   },
 
+  /**
+   * Stop and release animation targets.
+   * @returns {AnimationController}
+   */
   dispose() {
     const job = this[controllerJob]
     if (job !== undefined) disposeJob(job)
     return this
   },
 
+  /** @returns {AnimationOutcome | null} Settlement reason, or null while pending. */
   get outcome() {
     return this[controllerOutcome]
   },
 
+  /** @type {Promise<void>['then']} */
   then(onFulfilled, onRejected) {
     return this[controllerPromise].then(onFulfilled, onRejected)
   },
 
+  /** @type {Promise<void>['catch']} */
   catch(onRejected) {
     return this[controllerPromise].catch(onRejected)
   },
 
+  /** @type {Promise<void>['finally']} */
   finally(onFinally) {
     return this[controllerPromise].finally(onFinally)
   },
 }
 
 const factories = {
+  /**
+   * Animate properties on one or more targets.
+   * @param {AnimationTarget | AnimationTarget[]} targets
+   * @param {AnimationProperties} properties
+   * @param {AnimationOptions} [options]
+   * @returns {AnimationController}
+   */
   animate(targets, properties, options) {
     const groupState = getGroupState(this)
     const multipleTargets = Array.isArray(targets) === true
@@ -154,6 +245,11 @@ const factories = {
     return addJob(segments, groupState)
   },
 
+  /**
+   * Run steps one after another.
+   * @param {SequenceStep[]} steps Durations and delays are in ms.
+   * @returns {AnimationController}
+   */
   sequence(steps) {
     const groupState = getGroupState(this)
     let cursor = 0
@@ -169,8 +265,9 @@ const factories = {
 
   /**
    * Animate steps positioned within a timeline.
-   * @param {Array<object>} items Animation steps or groups of steps.
+   * @param {(TimelineStep | TimelineGroup)[]} items Positions and durations are fractions from 0 to 1.
    * @param {number} [timelineDuration=1000] Total duration in milliseconds.
+   * @returns {AnimationController}
    */
   timeline(items, timelineDuration = 1000) {
     const groupState = getGroupState(this)
@@ -194,6 +291,10 @@ const factories = {
 
 const groupPrototype = {
   ...factories,
+  /**
+   * Pause all animations in the group.
+   * @returns {AnimationGroup}
+   */
   pause() {
     const groupState = this[groupStateSymbol]
     if (groupState.disposed || groupState.paused) return this
@@ -201,6 +302,10 @@ const groupPrototype = {
     for (const job of groupState.jobs) updateJobPause(job)
     return this
   },
+  /**
+   * Resume the group. Individually paused animations stay paused.
+   * @returns {AnimationGroup}
+   */
   resume() {
     const groupState = this[groupStateSymbol]
     if (groupState.disposed || !groupState.paused) return this
@@ -208,10 +313,18 @@ const groupPrototype = {
     for (const job of groupState.jobs) updateJobPause(job)
     return this
   },
+  /**
+   * Stop current animations. The group can be used again.
+   * @returns {AnimationGroup}
+   */
   cancel() {
     for (const job of this[groupStateSymbol].jobs) settleJob(job, 'cancelled')
     return this
   },
+  /**
+   * Stop animations and close the group.
+   * @returns {AnimationGroup}
+   */
   dispose() {
     const groupState = this[groupStateSymbol]
     groupState.disposed = true
@@ -235,6 +348,11 @@ const animate = {
 
   plugin() {
     return {
+      /**
+       * Connect the plugin to the renderer before starting animations.
+       * @param {import('@lightningjs/blits').ComponentBase | import('@lightningjs/renderer').RendererMain} applicationOrRenderer
+       * @returns {void}
+       */
       init(applicationOrRenderer) {
         const nextRenderer = getRenderer(applicationOrRenderer)
 
@@ -250,6 +368,10 @@ const animate = {
       },
 
       ...factories,
+      /**
+       * Create a group to control animations together.
+       * @returns {AnimationGroup}
+       */
       group() {
         const group = Object.create(groupPrototype)
         group[groupStateSymbol] = { jobs: new Set(), disposed: false, paused: false }
@@ -350,6 +472,7 @@ function updateJobPause(job) {
   }
 }
 
+/** @returns {AnimationController} */
 function createController(job, promise) {
   const controller = Object.create(controllerPrototype)
   controller[controllerJob] = job
