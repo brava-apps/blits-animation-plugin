@@ -48,15 +48,25 @@ import htmlColors from '@lightningjs/blits/colors'
  */
 
 /**
- * @typedef {AnimationStep & { delay?: number }} SequenceStep
- * @typedef {AnimationStep & { at: number }} TimelineStep
- * @typedef {Omit<AnimationStep, 'element'> & { element?: AnimationTarget, at?: number }} TimelineGroupStep
+ * @typedef {Object} TimelinePosition
+ * @property {number} at Start position as a fraction of the total timeline duration, from 0 to 1.
+ * For example, 0 starts immediately and 0.5 starts halfway through the timeline.
+ * Within a group, omit at to start after the previous step.
+ * For a group itself, omit at to start at 0.
  */
 
 /**
- * @typedef {Object} TimelineGroup
+ * @typedef {AnimationStep & { delay?: number }} SequenceStep
+ * @typedef {AnimationStep & TimelinePosition} TimelineStep
+ * @typedef {Omit<AnimationStep, 'element'> & { element?: AnimationTarget } & Partial<TimelinePosition>} TimelineGroupStep
+ * @typedef {TimelineGroupOptions & Partial<TimelinePosition>} TimelineGroup
+ */
+
+/**
+ * @typedef {Object} TimelineGroupOptions
  * @property {AnimationTarget} [element] Default target for the steps.
- * @property {number} [at=0] Start position as a fraction of the timeline.
+ * @property {never} [prop] Property names belong to individual steps, not the group.
+ * @property {never} [value] Target values belong to individual steps, not the group.
  * @property {TimelineGroupStep[]} steps Steps run in order unless they have an explicit at.
  */
 
