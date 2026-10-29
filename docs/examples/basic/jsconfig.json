@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "paths": {
+      "@lightningjs/blits": ["./node_modules/@lightningjs/blits/index.d.ts"],
+      "@brava-apps/blits-animation-plugin": ["../../../declarations/index.d.ts"]
+    },
+    "types": ["@brava-apps/blits-animation-plugin"],
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.js"]
+}
